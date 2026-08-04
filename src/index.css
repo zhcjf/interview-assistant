@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Animation keyframes */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes zoom-in-95 {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-in-from-top-2 {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in {
+  animation-duration: 200ms;
+  animation-fill-mode: both;
+}
+.fade-in {
+  animation-name: fade-in;
+}
+.zoom-in-95 {
+  animation-name: zoom-in-95;
+}
+.slide-in-from-top-2 {
+  animation-name: slide-in-from-top-2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #1A2332;
+  background: #F5F7FA;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D0D7DE;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B0BEC5;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-card shadow-card transition-shadow duration-300;
+  }
+  .card:hover {
+    @apply shadow-card-hover;
+  }
+  .btn-primary {
+    @apply bg-brand text-white rounded-lg px-6 py-2.5 text-sm font-medium transition-colors duration-200 hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-white text-text-secondary border border-border rounded-lg px-6 py-2.5 text-sm font-medium transition-colors duration-200 hover:bg-gray-50;
+  }
+  .btn-danger {
+    @apply bg-danger text-white rounded-lg px-6 py-2.5 text-sm font-medium transition-colors duration-200 hover:bg-red-600;
+  }
+  .btn-text {
+    @apply text-brand text-sm font-medium hover:text-brand-hover transition-colors duration-200;
+  }
+  .input {
+    @apply w-full px-3 py-2 text-sm border border-border rounded-lg bg-white text-text-primary placeholder-text-tertiary outline-none transition-colors duration-200 focus:border-brand focus:ring-2 focus:ring-brand/10;
+  }
+  .input-error {
+    @apply border-danger focus:border-danger focus:ring-danger/10;
+  }
+  .textarea {
+    @apply input resize-y min-h-[80px];
+  }
+  .label {
+    @apply block text-sm font-medium text-text-primary mb-1.5;
+  }
+  .label-required::after {
+    content: ' *';
+    color: #FF4D4F;
+  }
+  .tag {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+}
