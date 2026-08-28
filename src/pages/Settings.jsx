@@ -21,6 +21,7 @@ import {
   fetchAvailableModels,
   PROVIDER_PRESETS,
 } from '../utils/ai-client.js'
+import { pushBackup, pullBackup, verifyBackupConfig } from '../utils/github-backup.js'
 
 // ============ AI 提供商列表（从 PROVIDER_PRESETS 派生，保持唯一数据源）============
 const PROVIDER_UI_META = {
@@ -111,6 +112,10 @@ export default function Settings() {
   // Backup Config
   const [backupConfig, setBackupConfig] = useState(getBackupConfig())
   const [showToken, setShowToken] = useState(false)
+  const [verifyingBackup, setVerifyingBackup] = useState(false)
+  const [backupVerified, setBackupVerified] = useState(false)
+  const [pushingBackup, setPushingBackup] = useState(false)
+  const [pullingBackup, setPullingBackup] = useState(false)
 
   useEffect(() => {
     saveAIConfig(aiConfig)
@@ -387,8 +392,76 @@ export default function Settings() {
     }
   }
 
+  // ── 云备份操作 ──────────────────────────────────────────────────────
+  const handleVerifyBackup = async () => {
+    if (!backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo) {
+      toast.error('请先填写 Token、用户名和仓库名')
+      return
+    }
+    setVerifyingBackup(true)
+    setBackupVerified(false)
+    const result = await verifyBackupConfig(backupConfig)
+    setVerifyingBackup(false)
+    if (result.ok) {
+      setBackupVerified(true)
+      toast.success(result.msg || '✓ GitHub 连接正常')
+    } else {
+      toast.error(result.msg || '验证失败')
+    }
+  }
+
+  const handlePushBackup = async () => {
+    if (!backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo) {
+      toast.error('请先填写并验证备份配置')
+      return
+    }
+    setPushingBackup(true)
+    const data = exportAllData()
+    const result = await pushBackup(backupConfig, data)
+    setPushingBackup(false)
+    if (result.ok) {
+      const updated = { ...backupConfig, lastBackupAt: new Date().toISOString(), lastBackupStatus: 'success' }
+      setBackupConfig(updated)
+      saveBackupConfig(updated)
+      toast.success(result.msg || '备份成功')
+    } else {
+      const updated = { ...backupConfig, lastBackupAt: new Date().toISOString(), lastBackupStatus: 'fail' }
+      setBackupConfig(updated)
+      saveBackupConfig(updated)
+      toast.error(result.msg || '备份失败')
+    }
+  }
+
+  const handlePullBackup = async () => {
+    if (!backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo) {
+      toast.error('请先填写并验证备份配置')
+      return
+    }
+    const ok = await confirm({
+      title: '从云端恢复数据',
+      message: '此操作会用云端数据覆盖当前本地数据，确认继续吗？建议先导出本地数据作为备份。',
+      confirmText: '确认恢复',
+      danger: true,
+    })
+    if (!ok) return
+    setPullingBackup(true)
+    const result = await pullBackup(backupConfig)
+    setPullingBackup(false)
+    if (result.ok && result.data) {
+      const importResult = importPhase1Data(result.data)
+      if (importResult.ok) {
+        toast.success(`${result.msg} — 已恢复 ${importResult.stats.jobs} 个岗位、${importResult.stats.interviews} 条面试`)
+        setTimeout(() => window.location.reload(), 1800)
+      } else {
+        toast.error('恢复失败：' + importResult.msg)
+      }
+    } else {
+      toast.error(result.msg || '拉取失败')
+    }
+  }
+
   return (
-    <div className="px-8 py-6 max-w-3xl mx-auto">
+    <div className="px-4 md:px-8 py-6 max-w-3xl mx-auto">
       <h2 className="text-2xl font-semibold text-text-primary mb-1">数据与设置</h2>
       <p className="text-sm text-text-tertiary mb-6">配置 AI 模型、云备份与数据管理</p>
 
@@ -759,22 +832,23 @@ export default function Settings() {
           </div>
           <div className="flex-1">
             <h3 className="text-base font-semibold text-text-primary">云端备份 (可选)</h3>
-            <p className="text-sm text-text-tertiary mt-0.5">配置 GitHub Token，实现跨设备数据同步。换电脑/手机也能看到你的数据</p>
+            <p className="text-sm text-text-tertiary mt-0.5">配置你自己的 GitHub Token，实现跨设备数据同步。换电脑 / 手机也能恢复数据</p>
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-gray-50 border border-border space-y-4">
+          {/* 启用开关 */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-text-primary">启用云端备份</p>
-              <p className="text-xs text-text-tertiary mt-0.5">每次数据变更自动同步到你 GitHub 仓库的 data-backup.json</p>
+              <p className="text-xs text-text-tertiary mt-0.5">手动备份 / 恢复数据到你的 GitHub 仓库</p>
             </div>
             <button
-              onClick={() => setBackupConfig({ ...backupConfig, enabled: !backupConfig.enabled })}
+              onClick={() => setBackupConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
               className={`relative w-12 h-6 rounded-full transition-colors ${backupConfig.enabled ? 'bg-success' : 'bg-gray-300'}`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
                   backupConfig.enabled ? 'translate-x-6' : ''
                 }`}
               />
@@ -783,6 +857,13 @@ export default function Settings() {
 
           {backupConfig.enabled && (
             <>
+              {/* 说明 */}
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-text-secondary leading-relaxed space-y-1">
+                <p>💡 <span className="font-medium">工作原理</span>：点击「立即备份」→ 数据推送到你 GitHub 仓库的 <code className="bg-blue-100 px-1 rounded">data-backup</code> 分支。换设备后填写同一 Token → 点「从云端恢复」即可。</p>
+                <p>🔑 需要 Fine-grained Token，勾选目标仓库的 <strong>Contents: Read and write</strong> 权限即可。</p>
+              </div>
+
+              {/* GitHub Token */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-medium text-text-secondary">GitHub Personal Access Token</label>
@@ -801,7 +882,10 @@ export default function Settings() {
                     className="input w-full pr-20"
                     placeholder="github_pat_xxx..."
                     value={backupConfig.ghToken}
-                    onChange={(e) => setBackupConfig({ ...backupConfig, ghToken: e.target.value })}
+                    onChange={(e) => {
+                      setBackupConfig((prev) => ({ ...prev, ghToken: e.target.value }))
+                      setBackupVerified(false)
+                    }}
                   />
                   <button
                     onClick={() => setShowToken(!showToken)}
@@ -810,19 +894,21 @@ export default function Settings() {
                     {showToken ? '隐藏' : '显示'}
                   </button>
                 </div>
-                <p className="text-xs text-text-tertiary mt-1.5">
-                  🔒 只需要 Contents: Read and write 权限，限定到 interview-assistant 单仓库
-                </p>
+                <p className="text-xs text-text-tertiary mt-1.5">🔒 Token 只存储在你本地浏览器，不会上传任何服务器</p>
               </div>
 
+              {/* 用户名 + 仓库名 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-text-secondary mb-1.5 block">GitHub 用户名</label>
                   <input
                     className="input w-full"
-                    placeholder="zhcjf"
+                    placeholder="你的 GitHub 用户名"
                     value={backupConfig.owner}
-                    onChange={(e) => setBackupConfig({ ...backupConfig, owner: e.target.value })}
+                    onChange={(e) => {
+                      setBackupConfig((prev) => ({ ...prev, owner: e.target.value }))
+                      setBackupVerified(false)
+                    }}
                   />
                 </div>
                 <div>
@@ -831,26 +917,53 @@ export default function Settings() {
                     className="input w-full"
                     placeholder="interview-assistant"
                     value={backupConfig.repo}
-                    onChange={(e) => setBackupConfig({ ...backupConfig, repo: e.target.value })}
+                    onChange={(e) => {
+                      setBackupConfig((prev) => ({ ...prev, repo: e.target.value }))
+                      setBackupVerified(false)
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
-                <p className="text-xs text-text-secondary leading-relaxed">
-                  💡 <span className="font-medium">工作原理</span>：你填写数据 → 本机先存 IndexedDB → 后台静默推送到你仓库的
-                  data-backup.json。换设备打开 → 自动从 GitHub 拉取恢复。
-                </p>
-              </div>
-
+              {/* 上次备份状态 */}
               {backupConfig.lastBackupAt && (
                 <p className="text-xs text-text-tertiary">
                   上次备份：{new Date(backupConfig.lastBackupAt).toLocaleString()}{' '}
                   <span className={backupConfig.lastBackupStatus === 'success' ? 'text-success' : 'text-danger'}>
-                    {backupConfig.lastBackupStatus === 'success' ? '成功' : '失败'}
+                    {backupConfig.lastBackupStatus === 'success' ? '✓ 成功' : '✗ 失败'}
                   </span>
                 </p>
               )}
+
+              {/* 操作按钮行 */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  onClick={handleVerifyBackup}
+                  disabled={verifyingBackup || !backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo}
+                  className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {verifyingBackup ? '验证中...' : '验证配置'}
+                </button>
+                <button
+                  onClick={handlePushBackup}
+                  disabled={pushingBackup || !backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pushingBackup ? '备份中...' : '☁ 立即备份'}
+                </button>
+                <button
+                  onClick={handlePullBackup}
+                  disabled={pullingBackup || !backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo}
+                  className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pullingBackup ? '恢复中...' : '⬇ 从云端恢复'}
+                </button>
+                {backupVerified && (
+                  <span className="text-xs text-success flex items-center gap-1">
+                    <IconCheck width={12} height={12} /> 仓库连接正常
+                  </span>
+                )}
+              </div>
             </>
           )}
         </div>

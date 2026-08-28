@@ -18,16 +18,28 @@ const menuItems = [
   { to: '/settings', label: '数据与设置', icon: IconSettings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   return (
     <aside
-      className="w-60 flex-shrink-0 flex flex-col"
+      className="w-60 h-full flex-shrink-0 flex flex-col"
       style={{ background: '#1E2634' }}
     >
-      {/* Logo */}
+      {/* Logo + 手机关闭按钮 */}
       <div className="h-16 flex items-center px-5 gap-2.5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <IconLogo />
-        <span className="text-white font-semibold text-base tracking-tight">AI面试小助手</span>
+        <span className="text-white font-semibold text-base tracking-tight flex-1">AI面试小助手</span>
+        {/* 手机端显示关闭按钮 */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden text-[#B0BEC5] hover:text-white p-1 -mr-1"
+            aria-label="关闭菜单"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Menu */}
@@ -75,7 +87,7 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-5 py-4 text-xs text-[#5A6A7E] border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-        v1.0.0 · Phase 1 Demo
+        v2.0.0 · Phase 2
       </div>
     </aside>
   )

@@ -284,9 +284,9 @@ export function getBackupConfig() {
   return readObj(KEYS.BACKUP_CONFIG, {
     enabled: false,
     ghToken: '',
-    owner: 'zhcjf', // GitHub 用户名
+    owner: '',             // GitHub 用户名（由用户自行填写）
     repo: 'interview-assistant', // 仓库名
-    branch: 'main',
+    branch: 'data-backup',
     path: 'data-backup.json',
     lastBackupAt: null,
     lastBackupStatus: null, // 'success' | 'fail' | null
