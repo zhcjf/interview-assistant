@@ -1,0 +1,21 @@
+{
+  "jobs": [
+    {
+      "company": "快手",
+      "title": "商分",
+      "jdText": "AI使用，数据分析",
+      "stage": "准备中",
+      "status": "准备中",
+      "notes": "",
+      "id": "job_mssp5eqr_d36aj5",
+      "createdAt": "2026-08-14T08:40:11.235Z"
+    }
+  ],
+  "interviews": [],
+  "reviews": [],
+  "resumes": [],
+  "chatHistory": [],
+  "exportedAt": "2026-08-28T13:34:40.092Z",
+  "version": "2.0.0",
+  "backedUpAt": "2026-08-28T13:34:41.583Z"
+}
