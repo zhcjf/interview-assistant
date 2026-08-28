@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar.jsx'
 import TopBar from './TopBar.jsx'
+import { getBackupConfig, saveBackupConfig, exportAllData } from '../utils/storage.js'
+import { pushBackup } from '../utils/github-backup.js'
 
 const TITLES = {
   '/': '首页看板',
@@ -25,11 +27,55 @@ export default function Layout() {
   const title = getTitle(location.pathname)
   // 手机端侧边栏默认关闭
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // 云同步状态：null | 'syncing' | 'ok' | 'fail'
+  const [syncStatus, setSyncStatus] = useState(null)
+  const debounceTimer = useRef(null)
+  const syncOkTimer = useRef(null)
 
   // 路由切换时自动关闭手机侧边栏
   useEffect(() => {
     setSidebarOpen(false)
   }, [location.pathname])
+
+  // 自动备份：防抖 5 秒，数据不变时不重复触发
+  const triggerAutoBackup = useCallback(async () => {
+    const cfg = getBackupConfig()
+    if (!cfg.enabled || !cfg.ghToken || !cfg.owner || !cfg.repo) return
+
+    setSyncStatus('syncing')
+    const data = exportAllData()
+    const result = await pushBackup(cfg, data)
+
+    const now = new Date().toISOString()
+    saveBackupConfig({
+      ...cfg,
+      lastBackupAt: now,
+      lastBackupStatus: result.ok ? 'success' : 'fail',
+    })
+
+    if (result.ok) {
+      setSyncStatus('ok')
+      // 3 秒后状态标志淡出
+      clearTimeout(syncOkTimer.current)
+      syncOkTimer.current = setTimeout(() => setSyncStatus(null), 3000)
+    } else {
+      setSyncStatus('fail')
+    }
+  }, [])
+
+  // 监听业务数据变更事件
+  useEffect(() => {
+    const handler = () => {
+      clearTimeout(debounceTimer.current)
+      debounceTimer.current = setTimeout(triggerAutoBackup, 5000)
+    }
+    window.addEventListener('ia:data-changed', handler)
+    return () => {
+      window.removeEventListener('ia:data-changed', handler)
+      clearTimeout(debounceTimer.current)
+      clearTimeout(syncOkTimer.current)
+    }
+  }, [triggerAutoBackup])
 
   return (
     <div className="flex h-screen overflow-hidden bg-content">
@@ -54,7 +100,11 @@ export default function Layout() {
 
       {/* ── 右侧主区域 ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <TopBar title={title} onMenuClick={() => setSidebarOpen(true)} />
+        <TopBar
+          title={title}
+          onMenuClick={() => setSidebarOpen(true)}
+          syncStatus={syncStatus}
+        />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>

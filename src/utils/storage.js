@@ -32,9 +32,18 @@ function readObj(key, fallback = {}) {
   return fallback
 }
 
+// 只有业务数据 key 变更才触发自动备份信号（不含配置 key）
+const DATA_KEYS_SET = new Set([
+  'ia_jobs', 'ia_interviews', 'ia_reviews', 'ia_resumes', 'ia_chat_history',
+])
+
 function write(key, data) {
   try {
     localStorage.setItem(key, JSON.stringify(data))
+    // 派发自定义事件，供 Layout 监听并触发自动备份
+    if (DATA_KEYS_SET.has(key) && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ia:data-changed'))
+    }
     return true
   } catch (e) {
     console.error('localStorage write error:', key, e)
