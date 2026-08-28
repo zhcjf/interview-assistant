@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
-import { getInterview, getJob, getReviewByInterview, saveInterview, deleteInterview } from '../utils/storage.js'
+import { getInterview, getJob, getReviewByInterview, saveInterview, deleteInterview, getAIConfig } from '../utils/storage.js'
 import { useToast } from '../components/Toast.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import Modal from '../components/Modal.jsx'
@@ -22,6 +22,7 @@ import {
   IconClock,
   IconUser,
   IconChevronRight,
+  IconSparkles,
 } from '../components/Icons.jsx'
 
 export default function InterviewDetail() {
@@ -113,13 +114,23 @@ export default function InterviewDetail() {
             编辑
           </button>
           {!review ? (
-            <button
-              className="btn-primary"
-              onClick={() => navigate(`/reviews/new/${interview.id}`)}
-            >
-              <IconReview width={16} height={16} className="inline mr-1.5 -mt-0.5" />
-              开始复盘
-            </button>
+            <>
+              <button
+                className="btn-secondary border-brand/30 text-brand hover:bg-brand/10"
+                onClick={() => navigate(`/reviews/new/${interview.id}?ai=1`)}
+                title="基于面试问答记录，AI 自动生成复盘初稿"
+              >
+                <IconSparkles width={16} height={16} className="inline mr-1.5 -mt-0.5" />
+                AI 生成复盘
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => navigate(`/reviews/new/${interview.id}`)}
+              >
+                <IconReview width={16} height={16} className="inline mr-1.5 -mt-0.5" />
+                手动复盘
+              </button>
+            </>
           ) : (
             <button
               className="btn-primary"

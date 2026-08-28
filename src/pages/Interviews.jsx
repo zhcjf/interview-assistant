@@ -88,7 +88,7 @@ export default function Interviews() {
         <div className="flex items-center gap-3">
           <button className="btn-secondary" onClick={() => setUploadOpen(true)}>
             <IconUpload width={16} height={16} className="inline mr-1.5 -mt-0.5" />
-            上传文字记录
+            上传面试记录
           </button>
           <button className="btn-primary" onClick={() => setCreateOpen(true)}>
             <IconPlus width={16} height={16} className="inline mr-1.5 -mt-0.5" />

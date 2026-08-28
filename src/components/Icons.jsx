@@ -163,6 +163,47 @@ export const IconClock = (p) => (
     <polyline points="12 6 12 12 16 14" />
   </svg>
 )
+export const IconCloud = (p) => (
+  <svg {...baseProps} {...p}>
+    <path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z" />
+  </svg>
+)
+export const IconAI = (p) => (
+  <svg {...baseProps} {...p}>
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+  </svg>
+)
+export const IconSend = (p) => (
+  <svg {...baseProps} {...p}>
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </svg>
+)
+export const IconSparkles = (p) => (
+  <svg {...baseProps} {...p}>
+    <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+  </svg>
+)
+export const IconChevronDown = (p) => (
+  <svg {...baseProps} {...p}>
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+)
+export const IconChevronUp = (p) => (
+  <svg {...baseProps} {...p}>
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+)
+export const IconFileText = (p) => (
+  <svg {...baseProps} {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
+    <polyline points="10 9 9 9 8 9" />
+  </svg>
+)
 
 export const IconUser = (p) => (
   <svg {...baseProps} {...p}>

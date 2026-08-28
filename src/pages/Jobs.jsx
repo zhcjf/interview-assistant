@@ -4,14 +4,17 @@ import { useToast } from '../components/Toast.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import Modal from '../components/Modal.jsx'
 import EmptyState from '../components/EmptyState.jsx'
+import ResumeUploader from '../components/ResumeUploader.jsx'
+import MatchAnalysisModal from '../components/MatchAnalysisModal.jsx'
 import { StatusTag, JOB_STATUS_STYLE, JOB_STATUS, JOB_STAGES, formatDate } from '../components/ui.jsx'
-import { IconPlus, IconEdit, IconTrash, IconBriefcase } from '../components/Icons.jsx'
+import { IconPlus, IconEdit, IconTrash, IconBriefcase, IconSparkles } from '../components/Icons.jsx'
 import JobForm from '../components/JobForm.jsx'
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingJob, setEditingJob] = useState(null)
+  const [matchJob, setMatchJob] = useState(null)
   const { confirm, dialog } = useConfirm()
   const toast = useToast()
 
@@ -62,6 +65,15 @@ export default function Jobs() {
         </button>
       </div>
 
+      {/* 简历上传区 (Phase 2 新增) */}
+      <ResumeUploader />
+
+      {/* 岗位列表标题 */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold text-text-primary">投递岗位</h3>
+        <span className="text-xs text-text-tertiary">共 {jobs.length} 个</span>
+      </div>
+
       {/* List */}
       {jobs.length === 0 ? (
         <div className="card">
@@ -103,6 +115,13 @@ export default function Jobs() {
                   </span>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={() => setMatchJob(job)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-tertiary hover:bg-brand/10 hover:text-brand transition-colors"
+                      title="分析简历匹配度"
+                    >
+                      <IconSparkles width={16} height={16} />
+                    </button>
+                    <button
                       onClick={() => openEdit(job)}
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-text-tertiary hover:bg-gray-100 hover:text-brand transition-colors"
                       title="编辑"
@@ -135,6 +154,12 @@ export default function Jobs() {
           onCancel={() => setModalOpen(false)}
         />
       </Modal>
+
+      <MatchAnalysisModal
+        open={!!matchJob}
+        onClose={() => setMatchJob(null)}
+        jobId={matchJob?.id}
+      />
       {dialog}
     </div>
   )

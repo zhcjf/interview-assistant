@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getReview, getInterview, getJob, deleteReview } from '../utils/storage.js'
+import { downloadReviewMarkdown } from '../utils/markdownExport.js'
 import { useToast } from '../components/Toast.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
 import { StarRating } from '../components/StarRating.jsx'
@@ -87,9 +88,15 @@ export default function ReviewDetail() {
             <IconEdit width={16} height={16} className="inline mr-1.5 -mt-0.5" />
             编辑
           </button>
-          <button className="btn-secondary" onClick={() => toast.info('导出功能 Phase 2 上线')}>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              downloadReviewMarkdown(review, interview, job)
+              toast.success('Markdown 已导出')
+            }}
+          >
             <IconDownload width={16} height={16} className="inline mr-1.5 -mt-0.5" />
-            导出
+            导出 Markdown
           </button>
           <button className="btn-secondary text-danger border-danger/20 hover:bg-red-50" onClick={handleDelete}>
             <IconTrash width={16} height={16} className="inline mr-1.5 -mt-0.5" />

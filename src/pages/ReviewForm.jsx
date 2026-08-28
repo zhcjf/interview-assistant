@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getInterview, getJob, getReview, saveReview } from '../utils/storage.js'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { getInterview, getJob, getReview, saveReview, getAIConfig } from '../utils/storage.js'
+import { generateReview } from '../utils/ai-client.js'
 import { useToast } from '../components/Toast.jsx'
 import { StarRating } from '../components/StarRating.jsx'
 import { REVIEW_DIMENSIONS } from '../components/ui.jsx'
-import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconStar } from '../components/Icons.jsx'
+import { IconArrowLeft, IconPlus, IconTrash, IconCheck, IconStar, IconSparkles } from '../components/Icons.jsx'
 
 export default function ReviewForm() {
   const { interviewId, id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const [searchParams] = useSearchParams()
+  const autoAI = searchParams.get('ai') === '1'
 
   const [interview, setInterview] = useState(null)
   const [job, setJob] = useState(null)
@@ -21,8 +24,11 @@ export default function ReviewForm() {
     improvements: [''],
     actions: [{ text: '', done: false }],
     nextStepAdvice: '',
+    aiGenerated: false,
   })
   const [saving, setSaving] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [genProgress, setGenProgress] = useState('')
 
   useEffect(() => {
     if (id) {
@@ -60,6 +66,13 @@ export default function ReviewForm() {
       }
     }
   }, [id, interviewId])
+
+  // 自动触发 AI 生成
+  useEffect(() => {
+    if (autoAI && interviewId && interview && !generating && !form.aiGenerated) {
+      handleAIGenerate()
+    }
+  }, [autoAI, interviewId, interview])
 
   if (!interview) {
     return (
@@ -133,6 +146,51 @@ export default function ReviewForm() {
     navigate(`/reviews/${saved.id}`)
   }
 
+  // ===== AI 一键生成初稿 =====
+  const handleAIGenerate = async () => {
+    const aiConfig = getAIConfig()
+    if (!aiConfig.apiKey) {
+      toast.error('AI 未配置，请先在设置页填入 API Key')
+      return
+    }
+    if (!interview || !interview.questions || interview.questions.length === 0) {
+      toast.error('该面试记录暂无问答内容，无法生成复盘')
+      return
+    }
+
+    setGenerating(true)
+    setGenProgress('AI 正在分析你的面试记录，通常需要 10-30 秒...')
+    try {
+      const result = await generateReview(aiConfig, interview, job)
+      // 合并 AI 结果到表单
+      setForm((f) => {
+        const qaDetails = (f.qaDetails || []).map((qa, i) => ({
+          ...qa,
+          score: result.qaDetails?.[i]?.score ?? qa.score ?? 3,
+          comment: result.qaDetails?.[i]?.comment || qa.comment || '',
+        }))
+        return {
+          ...f,
+          qaDetails,
+          dimensionScores: result.dimensionScores || f.dimensionScores,
+          highlights: (result.highlights && result.highlights.length ? result.highlights : f.highlights),
+          improvements: (result.improvements && result.improvements.length ? result.improvements : f.improvements),
+          actions: (result.actions && result.actions.length
+            ? result.actions.map((a) => (typeof a === 'string' ? { text: a, done: false } : { ...a, done: a.done || false }))
+            : f.actions),
+          nextStepAdvice: result.nextStepAdvice || f.nextStepAdvice,
+          aiGenerated: true,
+        }
+      })
+      toast.success('AI 初稿已生成，请逐项核对后保存')
+    } catch (e) {
+      toast.error('AI 生成失败：' + e.message)
+    } finally {
+      setGenerating(false)
+      setGenProgress('')
+    }
+  }
+
   return (
     <div className="px-8 py-6 max-w-3xl mx-auto pb-24">
       {/* Header */}
@@ -152,9 +210,44 @@ export default function ReviewForm() {
         </div>
       </div>
 
-      <h2 className="text-2xl font-semibold text-text-primary mb-6">
+      <h2 className="text-2xl font-semibold text-text-primary mb-2">
         {existing ? '编辑复盘' : '新建复盘'}
       </h2>
+      {form.aiGenerated && (
+        <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
+          <IconSparkles width={12} height={12} />
+          AI 生成 · 待人工确认
+        </div>
+      )}
+
+      {/* AI 一键生成区 */}
+      <section className="card p-5 mb-5 border-brand/30 bg-gradient-to-br from-brand/5 to-transparent">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center text-brand flex-shrink-0">
+            <IconSparkles width={20} height={20} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-text-primary">AI 一键生成初稿</h3>
+            <p className="text-sm text-text-tertiary mt-1">
+              基于本次面试的问答记录，AI 自动生成各维度评分、亮点、待改进和行动建议。生成后可逐项编辑。
+            </p>
+            {genProgress && (
+              <p className="text-xs text-brand mt-2 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
+                {genProgress}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleAIGenerate}
+            disabled={generating}
+            className="btn-primary flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <IconSparkles width={16} height={16} />
+            {generating ? '生成中...' : form.aiGenerated ? '重新生成' : '生成初稿'}
+          </button>
+        </div>
+      </section>
 
       {/* Section 1: 面试概览 */}
       <section className="card p-6 mb-5">

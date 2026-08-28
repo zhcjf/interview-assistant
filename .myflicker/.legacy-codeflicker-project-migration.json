@@ -1,0 +1,15 @@
+{
+  "version": 5,
+  "source": "codeflicker",
+  "projectPath": "/Users/gloria/Desktop/myself/interview assistant",
+  "migratedAt": "2026-08-24T02:08:44.591Z",
+  "result": {
+    "moved": true,
+    "merged": false,
+    "conflicts": 0,
+    "rulesCopied": 0,
+    "rulesSkipped": 0,
+    "commandSkillsCreated": 0,
+    "commandSkillsSkipped": 0
+  }
+}
