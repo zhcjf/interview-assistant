@@ -48,8 +48,8 @@ export default function TopBar({ title, onMenuClick, syncStatus }) {
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/>
               </svg>
             )}
-            <span className="hidden sm:inline">
-              {syncStatus === 'syncing' ? '同步中' : syncStatus === 'ok' ? '已同步' : '同步失败'}
+            <span className="text-xs">
+              {syncStatus === 'syncing' ? '同步中' : syncStatus === 'ok' ? '已同步' : '失败'}
             </span>
           </div>
         )}
