@@ -1,10 +1,5 @@
 // File parsing utilities: txt / docx / pdf -> text -> QA pairs
-import mammoth from 'mammoth'
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?worker&inline'
-
-// Use bundled inline worker so it works under file:// protocol too
-pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker()
+// pdfjs 和 mammoth 体积大（~2MB），改为动态导入，只在用户实际上传文件时才加载
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB for text files
 const MAX_AUDIO_SIZE = 25 * 1024 * 1024 // 25MB (Groq Whisper 限制)
@@ -56,11 +51,17 @@ export async function readFileToText(file) {
     return await file.text()
   }
   if (ext === 'docx') {
+    // 按需动态加载 mammoth（~500KB），首屏不下载
+    const mammoth = (await import('mammoth')).default
     const arrayBuffer = await file.arrayBuffer()
     const result = await mammoth.extractRawText({ arrayBuffer })
     return result.value || ''
   }
   if (ext === 'pdf') {
+    // 按需动态加载 pdfjs（~1.5MB），首屏不下载
+    const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs')
+    // 使用 CDN worker，避免再次内联大文件
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
     const arrayBuffer = await file.arrayBuffer()
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
     let text = ''
