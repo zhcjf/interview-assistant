@@ -26,28 +26,39 @@ import { pushBackup, pullBackup, verifyBackupConfig } from '../utils/github-back
 // ============ AI 提供商列表（从 PROVIDER_PRESETS 派生，保持唯一数据源）============
 const PROVIDER_UI_META = {
   groq: {
-    desc: 'Llama 3.3 70B · 极速推理 · 免费无需信用卡',
+    desc: 'Llama 3.3 70B · 极速推理 · 免费无需信用卡 · 需代理',
     placeholder: 'gsk_...',
     docsUrl: 'https://console.groq.com/keys',
     recommended: true,
   },
   gemini: {
-    desc: 'Gemini 2.5 Flash · 100 万 token 上下文 · 每天 1500 次免费',
+    desc: 'Gemini 2.5 Flash · 100 万 token 上下文 · 每天 1500 次免费 · 需代理',
     placeholder: 'AIza...',
     docsUrl: 'https://aistudio.google.com/apikey',
+  },
+  zhipu: {
+    desc: '智谱 GLM-4-Flash · 国内直连 · 完全免费 · 支持截图识别',
+    placeholder: 'your_api_key...',
+    docsUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    recommended: true,
+  },
+  qwen: {
+    desc: 'Qwen Plus · 100 万 token 上下文 · 国内直连 · 支持截图识别',
+    placeholder: 'sk-...',
+    docsUrl: 'https://bailian.console.aliyun.com/api-key',
+  },
+  siliconflow: {
+    desc: '硅基流动 · DeepSeek/Qwen 等模型 · 国内直连 · 有免费额度',
+    placeholder: 'sk-...',
+    docsUrl: 'https://cloud.siliconflow.cn/account/ak',
   },
   agnes: {
     desc: 'Agnes 2.5 Flash · 512K 上下文 · 国内直连无需代理',
     placeholder: 'agnes-...',
     docsUrl: 'https://platform.agnes-ai.com/',
   },
-  qwen: {
-    desc: 'Qwen Plus · 100 万 token 上下文 · 中文理解最强',
-    placeholder: 'sk-...',
-    docsUrl: 'https://bailian.console.aliyun.com/api-key',
-  },
   openrouter: {
-    desc: '一个 key 使用 DeepSeek / Llama / Gemma 等 20+ 免费模型',
+    desc: '一个 key 使用 DeepSeek / Llama / Gemma 等 20+ 免费模型 · 需代理',
     placeholder: 'sk-or-v1-...',
     docsUrl: 'https://openrouter.ai/keys',
   },
@@ -59,7 +70,7 @@ const PROVIDER_UI_META = {
 }
 
 // 完整 PROVIDERS 列表（展示顺序）
-const PROVIDER_ORDER = ['groq', 'gemini', 'agnes', 'qwen', 'openrouter', 'custom']
+const PROVIDER_ORDER = ['groq', 'zhipu', 'qwen', 'siliconflow', 'gemini', 'agnes', 'openrouter', 'custom']
 const PROVIDERS = PROVIDER_ORDER.map((id) => {
   const meta = PROVIDER_UI_META[id] || {}
   const preset = PROVIDER_PRESETS[id]

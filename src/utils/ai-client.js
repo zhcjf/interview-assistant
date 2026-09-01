@@ -10,10 +10,8 @@ const PROVIDER_CONFIGS = {
   },
   gemini: {
     name: 'Google Gemini',
-    // Gemini 使用 OpenAI 兼容端点，更便于浏览器调用
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     chatPath: '/chat/completions',
-    // 备选原生 endpoint: /v1beta/models/{model}:generateContent
   },
   agnes: {
     name: 'Agnes AI',
@@ -22,7 +20,6 @@ const PROVIDER_CONFIGS = {
   },
   qwen: {
     name: 'Qwen 通义千问',
-    // DashScope 的 OpenAI 兼容模式
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     chatPath: '/chat/completions',
   },
@@ -31,9 +28,18 @@ const PROVIDER_CONFIGS = {
     baseUrl: 'https://openrouter.ai/api/v1',
     chatPath: '/chat/completions',
   },
+  zhipu: {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    chatPath: '/chat/completions',
+  },
+  siliconflow: {
+    name: '硅基流动 SiliconFlow',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    chatPath: '/chat/completions',
+  },
   custom: {
     name: '自定义',
-    // 由用户在设置页填入
     baseUrl: '',
     chatPath: '/chat/completions',
   },
@@ -764,6 +770,10 @@ export function detectProviderFromKey(key) {
   if (k.startsWith('AIza')) return 'gemini'
   if (k.startsWith('sk-or-v1-')) return 'openrouter'
   if (k.startsWith('agnes-') || k.startsWith('ag_')) return 'agnes'
+  // 智谱 GLM Key 格式：长度64位的字母数字串（无前缀），或 JWT 格式
+  if (/^[0-9a-f]{32}\.[0-9a-zA-Z]{32}$/.test(k)) return 'zhipu'
+  // 硅基流动 Key：sk- 开头，但比 Qwen 更长（通常 > 40 字符）
+  if (k.startsWith('sf-') || k.startsWith('siliconflow-')) return 'siliconflow'
   if (k.startsWith('sk-')) return 'qwen' // 通义/Qwen 也用 sk-
   return null
 }
@@ -964,7 +974,28 @@ export const PROVIDER_PRESETS = {
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     chatPath: '/chat/completions',
     testModel: 'qwen-turbo',
-    models: ['qwen-plus', 'qwen-turbo', 'qwen-long', 'qwen-max', 'qwen2.5-72b-instruct', 'qwen2.5-7b-instruct'],
+    models: ['qwen-plus', 'qwen-turbo', 'qwen-long', 'qwen-max', 'qwen2.5-72b-instruct', 'qwen2.5-7b-instruct', 'qwen-vl-plus', 'qwen-vl-max'],
+  },
+  zhipu: {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    chatPath: '/chat/completions',
+    testModel: 'glm-4-flash',
+    models: ['glm-4-flash', 'glm-4-air', 'glm-4', 'glm-4v-flash', 'glm-4v', 'glm-z1-flash'],
+  },
+  siliconflow: {
+    name: '硅基流动 SiliconFlow',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    chatPath: '/chat/completions',
+    testModel: 'Qwen/Qwen2.5-7B-Instruct',
+    models: [
+      'Qwen/Qwen2.5-7B-Instruct',
+      'Qwen/Qwen2.5-72B-Instruct',
+      'deepseek-ai/DeepSeek-V3',
+      'deepseek-ai/DeepSeek-R1',
+      'Qwen/Qwen2-VL-7B-Instruct',   // 支持图片
+      'Pro/Qwen/Qwen2-VL-7B-Instruct', // 付费更准
+    ],
   },
 }
 
@@ -1098,12 +1129,14 @@ async function fileToBase64(file) {
 /** 根据当前 provider 选择合适的 vision 模型 */
 function getVisionModel(aiConfig) {
   const visionModels = {
-    gemini: 'gemini-2.0-flash',       // 支持图片，免费 1500次/天
-    qwen: 'qwen-vl-max',              // 通义千问视觉版
-    openrouter: 'meta-llama/llama-3.2-11b-vision-instruct:free', // 免费
-    agnes: 'gemini-2.0-flash',        // Agnes 通常兼容 Gemini
-    groq: null,                        // Groq 不支持视觉
-    custom: aiConfig.model,            // 自定义用当前模型
+    gemini: 'gemini-2.0-flash',                          // 需代理，免费 1500次/天
+    qwen: 'qwen-vl-plus',                                // 国内直连，通义千问视觉版
+    zhipu: 'glm-4v-flash',                               // 国内直连，完全免费！
+    siliconflow: 'Qwen/Qwen2-VL-7B-Instruct',            // 国内直连，免费额度
+    openrouter: 'meta-llama/llama-3.2-11b-vision-instruct:free', // 需代理，免费
+    agnes: 'gemini-2.0-flash',                           // Agnes 转发
+    groq: null,                                          // Groq 不支持视觉
+    custom: aiConfig.model,                              // 自定义用当前模型
   }
   return visionModels[aiConfig.provider] || aiConfig.model
 }
@@ -1119,7 +1152,7 @@ export async function parseJDFromImage(aiConfig, imageFile) {
     throw new Error('请先在设置页配置 AI Key')
   }
   if (aiConfig.provider === 'groq') {
-    throw new Error('Groq 暂不支持图片识别，请切换到 Gemini 或 OpenRouter')
+    throw new Error('Groq 暂不支持图片识别，推荐切换到：智谱 GLM（国内免费）、Qwen（国内）、OpenRouter（需代理）')
   }
 
   const visionModel = getVisionModel(aiConfig)
