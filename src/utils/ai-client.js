@@ -1080,3 +1080,141 @@ function extractJSON(text) {
   }
   throw new Error('AI 返回内容不是有效 JSON：' + text.slice(0, 200))
 }
+
+// ============ 岗位截图解析（Vision）============
+// 支持：Gemini、Qwen-VL、OpenRouter vision 模型、自定义 vision 端点
+// 不支持 Groq（目前无视觉模型）
+
+/** 把 File / Blob 转成 base64 data URL */
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result) // "data:image/...;base64,xxx"
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+/** 根据当前 provider 选择合适的 vision 模型 */
+function getVisionModel(aiConfig) {
+  const visionModels = {
+    gemini: 'gemini-2.0-flash',       // 支持图片，免费 1500次/天
+    qwen: 'qwen-vl-max',              // 通义千问视觉版
+    openrouter: 'meta-llama/llama-3.2-11b-vision-instruct:free', // 免费
+    agnes: 'gemini-2.0-flash',        // Agnes 通常兼容 Gemini
+    groq: null,                        // Groq 不支持视觉
+    custom: aiConfig.model,            // 自定义用当前模型
+  }
+  return visionModels[aiConfig.provider] || aiConfig.model
+}
+
+/**
+ * 上传岗位招聘截图，AI 解析出结构化信息
+ * @param {object} aiConfig - 当前 AI 配置
+ * @param {File} imageFile - 用户上传的图片文件
+ * @returns {{ company, title, jdText, notes }}
+ */
+export async function parseJDFromImage(aiConfig, imageFile) {
+  if (!aiConfig.apiKey) {
+    throw new Error('请先在设置页配置 AI Key')
+  }
+  if (aiConfig.provider === 'groq') {
+    throw new Error('Groq 暂不支持图片识别，请切换到 Gemini 或 OpenRouter')
+  }
+
+  const visionModel = getVisionModel(aiConfig)
+  if (!visionModel) {
+    throw new Error('当前 AI 提供商不支持图片识别，请切换到 Gemini / OpenRouter / Qwen')
+  }
+
+  // 压缩：超过 1MB 的图片先压缩到 800px 宽，减少 token 消耗
+  let processedFile = imageFile
+  if (imageFile.size > 1024 * 1024) {
+    processedFile = await compressImage(imageFile, 800)
+  }
+
+  const dataUrl = await fileToBase64(processedFile)
+  const base64Data = dataUrl.split(',')[1]
+  const mimeType = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg'
+
+  const prompt = `请识别这张招聘岗位截图，提取出以下信息并以 JSON 格式返回，不要任何多余说明：
+
+{
+  "company": "公司名称",
+  "title": "岗位名称/职位",
+  "jdText": "岗位描述/职责要求原文（尽量保留完整文字）",
+  "notes": "薪资/地点/学历等补充信息（可选）"
+}
+
+如果某个字段识别不出来，对应值留空字符串。`
+
+  const { url, headers } = getRequestConfig({ ...aiConfig, model: visionModel })
+
+  const body = {
+    model: visionModel,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${mimeType};base64,${base64Data}`,
+              detail: 'high',
+            },
+          },
+        ],
+      },
+    ],
+    temperature: 0.1,
+    max_tokens: 2000,
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  })
+
+  if (!response.ok) {
+    let errText = ''
+    try { errText = await response.text() } catch {}
+    if (response.status === 400 && errText.includes('vision')) {
+      throw new Error('当前模型不支持图片，请在设置中换用 Gemini 2.0 Flash 或 OpenRouter 视觉模型')
+    }
+    throw new Error(`识别失败（${response.status}）：${errText.slice(0, 150)}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error('AI 返回空内容')
+
+  return safeParseJSON(content)
+}
+
+/** 压缩图片到指定宽度，返回 Blob */
+async function compressImage(file, maxWidth = 800) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxWidth / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(
+        (blob) => resolve(blob || file),
+        'image/jpeg',
+        0.85
+      )
+    }
+    img.onerror = () => resolve(file) // 压缩失败就用原图
+    img.src = url
+  })
+}
+
