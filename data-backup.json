@@ -103,8 +103,16 @@
       "createdAt": "2026-09-01T02:54:31.996Z"
     }
   ],
-  "chatHistory": [],
-  "exportedAt": "2026-09-02T02:03:00.054Z",
+  "chatHistory": [
+    {
+      "jobId": "job_mtjfwtzq_5ndi7v",
+      "role": "user",
+      "content": "根据我的简历和字节跳动商业分析的岗位，生成有针对性的自我介绍，2-3分钟。直接生成讲稿",
+      "id": "chat_mtjgeaps_6jtwre",
+      "createdAt": "2026-09-02T02:04:56.128Z"
+    }
+  ],
+  "exportedAt": "2026-09-02T02:05:01.131Z",
   "version": "2.0.0",
-  "backedUpAt": "2026-09-02T02:03:01.283Z"
+  "backedUpAt": "2026-09-02T02:05:02.236Z"
 }
