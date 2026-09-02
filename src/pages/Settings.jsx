@@ -8,6 +8,7 @@ import {
   getBackupConfig,
   saveBackupConfig,
   importPhase1Data,
+  importAllData,
 } from '../utils/storage.js'
 import { useToast } from '../components/Toast.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
@@ -459,9 +460,12 @@ export default function Settings() {
     const result = await pullBackup(backupConfig)
     setPullingBackup(false)
     if (result.ok && result.data) {
-      const importResult = importPhase1Data(result.data)
+      const importResult = importAllData(result.data)
       if (importResult.ok) {
-        toast.success(`${result.msg} — 已恢复 ${importResult.stats.jobs} 个岗位、${importResult.stats.interviews} 条面试`)
+        const s = importResult.stats
+        toast.success(
+          `${result.msg} — 已恢复 ${s.jobs} 个岗位、${s.interviews} 条面试、${s.reviews} 条复盘、${s.resumes} 份简历、${s.chatHistory} 条对话${s.aiConfig ? '、AI 配置' : ''}`
+        )
         setTimeout(() => window.location.reload(), 1800)
       } else {
         toast.error('恢复失败：' + importResult.msg)

@@ -311,14 +311,61 @@ export function saveBackupConfig(config) {
 
 // ===== Data export / clear =====
 export function exportAllData() {
+  let verifiedProviders = {}
+  try { verifiedProviders = JSON.parse(localStorage.getItem('ia_verified_providers') || '{}') } catch {}
   return {
     jobs: getJobs(),
     interviews: getInterviews(),
     reviews: getReviews(),
     resumes: getResumes(),
     chatHistory: read(KEYS.CHAT_HISTORY),
+    aiConfig: readObj(KEYS.AI_CONFIG, {}),
+    verifiedProviders,
     exportedAt: new Date().toISOString(),
-    version: '2.0.0',
+    version: '2.1.0',
+  }
+}
+
+// 全量恢复：用云端数据覆盖本地（用于云备份恢复）
+export function importAllData(data) {
+  if (!data || typeof data !== 'object') {
+    return { ok: false, msg: '数据格式无效' }
+  }
+  try {
+    const stats = { jobs: 0, interviews: 0, reviews: 0, resumes: 0, chatHistory: 0, aiConfig: false }
+
+    if (Array.isArray(data.jobs)) {
+      write(KEYS.JOBS, data.jobs)
+      stats.jobs = data.jobs.length
+    }
+    if (Array.isArray(data.interviews)) {
+      write(KEYS.INTERVIEWS, data.interviews)
+      stats.interviews = data.interviews.length
+    }
+    if (Array.isArray(data.reviews)) {
+      write(KEYS.REVIEWS, data.reviews)
+      stats.reviews = data.reviews.length
+    }
+    if (Array.isArray(data.resumes)) {
+      write(KEYS.RESUMES, data.resumes)
+      stats.resumes = data.resumes.length
+    }
+    if (Array.isArray(data.chatHistory)) {
+      write(KEYS.CHAT_HISTORY, data.chatHistory)
+      stats.chatHistory = data.chatHistory.length
+    }
+    if (data.aiConfig && typeof data.aiConfig === 'object') {
+      write(KEYS.AI_CONFIG, data.aiConfig)
+      stats.aiConfig = true
+    }
+    if (data.verifiedProviders && typeof data.verifiedProviders === 'object') {
+      try { localStorage.setItem('ia_verified_providers', JSON.stringify(data.verifiedProviders)) } catch {}
+    }
+
+    return { ok: true, stats }
+  } catch (e) {
+    console.error('import all data failed:', e)
+    return { ok: false, msg: e.message || '导入失败' }
   }
 }
 
