@@ -156,6 +156,9 @@ priority 取值：high / medium / low。至少输出 3 个预测问题，建议 
 
 export const SYSTEM_PROMPT_INTERVIEW_PARSE = `你是一位面试记录结构化助手。请把任意格式的面试记录（面试官与候选人的对话、QA 笔记、自由流水记录等）解析成结构化的问答对 JSON。
 
+核心原则：**完整保留候选人的回答内容，绝不允许概括、删减或压缩。**
+用户的目标是：下次面试遇到相同问题时，能通过阅读上次的具体回答来改进优化。所以答案必须包含所有具体细节、举例、数字、项目名、技术方案等实质内容。
+
 注意：不要套用任何固定模板，根据原文语义智能识别：
 - 面试官提问 vs 候选人回答
 - 即使没有明显的"Q:/A:"标记，也要根据上下文判断问答关系
@@ -163,16 +166,23 @@ export const SYSTEM_PROMPT_INTERVIEW_PARSE = `你是一位面试记录结构化�
 - 招呼、寒暄、结束语等可忽略或并入相邻问答
 - 若整段没有问答关系（如纯叙述感想），则作为一个 item，question 留空，answer 放原文
 
+答案处理规则（关键）：
+1. **保留完整内容**：答案中所有观点、论据、举例、数字、项目细节、技术方案都要完整保留，不允许概括
+2. **清理语气词**：删除"嗯""啊""就是""然后""那个""怎么说呢"等无意义口头禅和重复 stuttering
+3. **梳理逻辑**：可将散乱口语调整为更连贯的书面表达，但不改变原意、不删减信息量
+4. **保持第一人称**：答案应保持候选人第一人称视角，保留其个人经历和观点
+5. **长答案 OK**：单条答案可以很长，不要因为"太长"而压缩，信息完整优先于简洁
+
 严格按 JSON 格式输出（不要 markdown 代码块，不要前后说明），结构如下：
 
 {
   "items": [
-    { "question": "面试官的提问", "answer": "候选人的回答" }
+    { "question": "面试官的提问", "answer": "候选人的完整回答（清理语气词后，保留全部实质内容）" }
   ],
   "summary": "整体感受或备注（可选，若原文未体现则留空字符串）"
 }
 
-items 至少 1 条；如能识别出多组问答则全部输出。`
+items 至少 1 条；如能识别出多组问答则全部输出。每条 answer 必须是完整内容，不是摘要。`
 
 // ============ 构建请求 URL 和 Headers ============
 function getRequestConfig(aiConfig) {
@@ -654,7 +664,7 @@ export async function parseInterviewText(aiConfig, rawText, context = {}, option
   ]
 
   const text = await chatCompletion(aiConfig, messages, {
-    maxTokens: 4000,
+    maxTokens: 8000,
     temperature: 0.2,
     ...options,
   })

@@ -111,7 +111,7 @@ export default function UploadModal({ open, onClose, jobs }) {
       try {
         setParseStage('parsing')
         setParseStageMsg('AI 正在解析面试记录结构...')
-        const result = await parseInterviewText(aiConfig, text.slice(0, 12000), jobContext)
+        const result = await parseInterviewText(aiConfig, text.slice(0, 30000), jobContext)
         const items = (result.items || []).map((it) => ({
           question: it.question || '',
           answer: it.answer || '',
