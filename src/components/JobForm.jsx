@@ -18,6 +18,7 @@ export default function JobForm({ job, onSave, onCancel }) {
   const [errors, setErrors] = useState({})
   const [parsing, setParsing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
 
   const update = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -38,6 +39,14 @@ export default function JobForm({ job, onSave, onCancel }) {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
+    await processImage(file)
+  }
+
+  const processImage = async (file) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('请上传图片文件')
+      return
+    }
 
     // 显示预览
     const url = URL.createObjectURL(file)
@@ -52,7 +61,6 @@ export default function JobForm({ job, onSave, onCancel }) {
     setParsing(true)
     try {
       const result = await parseJDFromImage(aiConfig, file)
-      // 合并识别结果，非空才覆盖（避免覆盖用户已填内容）
       setForm((prev) => ({
         ...prev,
         company: result.company || prev.company,
@@ -70,15 +78,40 @@ export default function JobForm({ job, onSave, onCancel }) {
     }
   }
 
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (parsing) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      processImage(file)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    if (!parsing) setDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+  }
+
   return (
     <div className="space-y-5">
-      {/* 截图上传区 */}
+      {/* 截图上传区（支持点击 + 拖拽） */}
       <div
         onClick={() => !parsing && fileInputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-xl transition-all cursor-pointer
-          ${parsing
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className={`relative border-2 border-dashed rounded-xl transition-all
+          ${dragOver
+            ? 'border-brand bg-brand/10 scale-[1.01]'
+            : parsing
             ? 'border-brand/40 bg-brand/5 cursor-wait'
-            : 'border-gray-200 hover:border-brand/50 hover:bg-brand/3'
+            : 'border-gray-200 hover:border-brand/50 hover:bg-brand/3 cursor-pointer'
           }`}
       >
         <input
@@ -119,7 +152,7 @@ export default function JobForm({ job, onSave, onCancel }) {
               </svg>
             </div>
             <p className="text-sm font-medium text-text-primary">上传岗位截图，AI 自动解析</p>
-            <p className="text-xs text-text-tertiary mt-0.5">支持招聘网站、企业公众号、聊天截图等 · 需先配置 AI Key</p>
+            <p className="text-xs text-text-tertiary mt-0.5">点击或拖拽图片到此处 · 支持招聘网站、企业公众号、聊天截图等</p>
           </div>
         )}
       </div>

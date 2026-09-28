@@ -320,6 +320,7 @@ export function exportAllData() {
     resumes: getResumes(),
     chatHistory: read(KEYS.CHAT_HISTORY),
     aiConfig: readObj(KEYS.AI_CONFIG, {}),
+    backupConfig: readObj(KEYS.BACKUP_CONFIG, {}),
     verifiedProviders,
     exportedAt: new Date().toISOString(),
     version: '2.1.0',
@@ -332,7 +333,7 @@ export function importAllData(data) {
     return { ok: false, msg: '数据格式无效' }
   }
   try {
-    const stats = { jobs: 0, interviews: 0, reviews: 0, resumes: 0, chatHistory: 0, aiConfig: false }
+    const stats = { jobs: 0, interviews: 0, reviews: 0, resumes: 0, chatHistory: 0, aiConfig: false, backupConfig: false }
 
     if (Array.isArray(data.jobs)) {
       write(KEYS.JOBS, data.jobs)
@@ -357,6 +358,10 @@ export function importAllData(data) {
     if (data.aiConfig && typeof data.aiConfig === 'object') {
       write(KEYS.AI_CONFIG, data.aiConfig)
       stats.aiConfig = true
+    }
+    if (data.backupConfig && typeof data.backupConfig === 'object') {
+      write(KEYS.BACKUP_CONFIG, data.backupConfig)
+      stats.backupConfig = true
     }
     if (data.verifiedProviders && typeof data.verifiedProviders === 'object') {
       try { localStorage.setItem('ia_verified_providers', JSON.stringify(data.verifiedProviders)) } catch {}

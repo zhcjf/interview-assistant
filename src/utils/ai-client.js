@@ -154,35 +154,53 @@ export const SYSTEM_PROMPT_PREDICT = `你是一位面试题预测助手。请基
 
 priority 取值：high / medium / low。至少输出 3 个预测问题，建议 5-8 个。`
 
-export const SYSTEM_PROMPT_INTERVIEW_PARSE = `你是一位面试记录结构化助手。请把任意格式的面试记录（面试官与候选人的对话、QA 笔记、自由流水记录等）解析成结构化的问答对 JSON。
+export const SYSTEM_PROMPT_INTERVIEW_PARSE = `你是一位专业的面试记录整理助手。请将面试录音的转录文本整理成结构化的问答对，并附上整体总结。
 
-核心原则：**完整保留候选人的回答内容，绝不允许概括、删减或压缩。**
-用户的目标是：下次面试遇到相同问题时，能通过阅读上次的具体回答来改进优化。所以答案必须包含所有具体细节、举例、数字、项目名、技术方案等实质内容。
+## 核心目标
+用户的目标是：下次面试遇到相同问题时，能通过阅读上次的具体回答来改进优化。因此回答必须完整保留实质内容，绝不允许概括删减，但要清理口语中的语气词和重复表达，使回答成为流畅的书面表达。
 
-注意：不要套用任何固定模板，根据原文语义智能识别：
-- 面试官提问 vs 候选人回答
-- 即使没有明显的"Q:/A:"标记，也要根据上下文判断问答关系
-- 如果是流水叙述，可拆成"问/答"对：把问题或话题作为 question，详细内容作为 answer
-- 招呼、寒暄、结束语等可忽略或并入相邻问答
-- 若整段没有问答关系（如纯叙述感想），则作为一个 item，question 留空，answer 放原文
+## 问答拆分规则
+1. 根据原文语义智能识别"面试官提问"与"候选人回答"的边界
+2. 即使没有明显的"Q:/A:"标记，也要根据上下文判断问答关系
+3. 招呼、寒暄、结束语等可忽略或并入相邻问答
+4. 每个面试官的提问应单独成一条，不要把多个问题合并到一条问答中
+5. 若整段没有问答关系（如纯叙述感想），则作为一个 item，question 留空，answer 放原文整理后的内容
 
-答案处理规则（关键）：
-1. **保留完整内容**：答案中所有观点、论据、举例、数字、项目细节、技术方案都要完整保留，不允许概括
-2. **清理语气词**：删除"嗯""啊""就是""然后""那个""怎么说呢"等无意义口头禅和重复 stuttering
-3. **梳理逻辑**：可将散乱口语调整为更连贯的书面表达，但不改变原意、不删减信息量
-4. **保持第一人称**：答案应保持候选人第一人称视角，保留其个人经历和观点
-5. **长答案 OK**：单条答案可以很长，不要因为"太长"而压缩，信息完整优先于简洁
+## 答案整理规则（关键）
+1. **完整保留内容**：所有观点、论据、举例、数字、项目细节、技术方案都要完整保留，不允许概括、删减或压缩
+2. **彻底清理语气词**：删除以下口头禅和无意义重复：
+   - 语气词：嗯、啊、呃、哈、哎、嘛、呢
+   - 口头禅：就是、然后、那个、那个就、怎么说呢、对吧、嘛、反正、其实、说白了
+   - 重复词：如"一部分一部分""我我""就是就是""会会"等重复表达
+   - 填充短语：可删掉不影响语义的"那的话""的话""这块的话""这部分的话"等
+3. **书面化表达**：将散乱口语调整为连贯流畅的书面表达，可重新组织句子顺序使之逻辑清晰，但不改变原意、不删减信息量
+4. **保持第一人称**：保持候选人第一人称视角，保留个人经历和观点
+5. **长答案 OK**：单条答案可以很长，信息完整优先于简洁
 
-严格按 JSON 格式输出（不要 markdown 代码块，不要前后说明），结构如下：
+## 问题整理规则
+1. 面试官的问题也要清理语气词，整理成清晰简洁的书面表达
+2. 如果面试官的问题中有补充说明或限定条件，保留在 question 中
+
+## 整体总结规则
+在所有问答对之后，提供一段整体总结，包含：
+- 面试的风格和节奏
+- 候选人表现的整体评价
+- 回答中的亮点和可改进之处
+- 面试官关注的重点方向
+
+## 输出格式
+严格按 JSON 格式输出（不要 markdown 代码块，不要前后说明）：
 
 {
   "items": [
-    { "question": "面试官的提问", "answer": "候选人的完整回答（清理语气词后，保留全部实质内容）" }
+    {
+      "question": "面试官的提问（清理语气词，简洁书面表达）",
+      "answer": "候选人的完整回答（彻底清理语气词，书面化整理，保留全部实质内容和细节）",
+      "keyPoints": ["关键词1", "关键词2", "关键词3"]
+    }
   ],
-  "summary": "整体感受或备注（可选，若原文未体现则留空字符串）"
-}
-
-items 至少 1 条；如能识别出多组问答则全部输出。每条 answer 必须是完整内容，不是摘要。`
+  "summary": "整体总结：面试风格、候选人表现、亮点与可改进之处、面试官关注重点"
+}`
 
 // ============ 构建请求 URL 和 Headers ============
 function getRequestConfig(aiConfig) {
@@ -664,7 +682,7 @@ export async function parseInterviewText(aiConfig, rawText, context = {}, option
   ]
 
   const text = await chatCompletion(aiConfig, messages, {
-    maxTokens: 8000,
+    maxTokens: 12000,
     temperature: 0.2,
     ...options,
   })
@@ -1144,9 +1162,9 @@ function getVisionModel(aiConfig) {
     zhipu: 'glm-4v-flash',                               // 国内直连，完全免费！
     siliconflow: 'Qwen/Qwen2-VL-7B-Instruct',            // 国内直连，免费额度
     openrouter: 'meta-llama/llama-3.2-11b-vision-instruct:free', // 需代理，免费
-    agnes: 'gemini-2.0-flash',                           // Agnes 转发
-    groq: null,                                          // Groq 不支持视觉
-    custom: aiConfig.model,                              // 自定义用当前模型
+    agnes: null,                                          // Agnes 不支持图片理解
+    groq: null,                                           // Groq 不支持视觉
+    custom: aiConfig.model,                               // 自定义用当前模型
   }
   return visionModels[aiConfig.provider] || aiConfig.model
 }
@@ -1161,8 +1179,9 @@ export async function parseJDFromImage(aiConfig, imageFile) {
   if (!aiConfig.apiKey) {
     throw new Error('请先在设置页配置 AI Key')
   }
-  if (aiConfig.provider === 'groq') {
-    throw new Error('Groq 暂不支持图片识别，推荐切换到：智谱 GLM（国内免费）、Qwen（国内）、OpenRouter（需代理）')
+  if (aiConfig.provider === 'groq' || aiConfig.provider === 'agnes') {
+    const name = aiConfig.provider === 'groq' ? 'Groq' : 'Agnes'
+    throw new Error(`${name} 暂不支持图片识别，推荐切换到：智谱 GLM（国内免费直连）、Qwen（国内）、OpenRouter（需代理）`)
   }
 
   const visionModel = getVisionModel(aiConfig)
