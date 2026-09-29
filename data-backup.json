@@ -1,1 +1,25 @@
-{"test":"hello","timestamp":"2026-09-29T01:57:17.821Z"}
+{
+  "jobs": [
+    {
+      "id": "test",
+      "company": "Test",
+      "title": "Test"
+    }
+  ],
+  "interviews": [],
+  "reviews": [],
+  "resumes": [],
+  "chatHistory": [],
+  "aiConfig": {
+    "provider": "agnes",
+    "model": "agnes-2.5-flash"
+  },
+  "backupConfig": {
+    "enabled": true,
+    "owner": "zhcjf",
+    "repo": "interview-assistant"
+  },
+  "exportedAt": "2026-09-29T04:47:16.900Z",
+  "version": "2.1.0",
+  "backedUpAt": "2026-09-29T04:47:16.901Z"
+}
