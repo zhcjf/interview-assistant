@@ -310,74 +310,40 @@ export function saveBackupConfig(config) {
 }
 
 // ===== Data export / clear =====
-// 简单可逆编码：避免明文 API Key 触发 GitHub Secret Scanning 拦截推送
-// 使用 base64 编码，GitHub Secret Scanning 无法识别 base64 字符串为密钥
-// 不是安全加密，仅绕过自动扫描；Key 本身已通过 GitHub Token 访问权限保护
-function obscure(str) {
-  if (!str || typeof str !== 'string') return str
-  try {
-    return 'ENC:' + btoa(unescape(encodeURIComponent(str)))
-  } catch {
-    return 'ENC:' + btoa(str)
+// 安全排除：GitHub Secret Scanning 会检测明文和 base64 编码的 API Key，
+// 所以备份时完全不包含敏感密钥字段。恢复时保留当前设备的本地密钥。
+// 不含密钥的配置（provider、model、endpoint 等）仍然同步。
+
+function stripSecretsFromAIConfig(cfg) {
+  if (!cfg || typeof cfg !== 'object') return cfg
+  const { apiKey, apiKeys, audio, ...safe } = cfg
+  // audio 子对象中也有 apiKey，排除
+  if (audio) {
+    const { apiKey: _ak, ...audioSafe } = audio
+    safe.audio = audioSafe
   }
-}
-function unobscure(str) {
-  if (!str || typeof str !== 'string') return str
-  if (!str.startsWith('ENC:')) return str
-  try {
-    return decodeURIComponent(escape(atob(str.slice(4))))
-  } catch {
-    return atob(str.slice(4))
-  }
+  return safe
 }
 
-// 对配置中的敏感字段做脱敏编码
-function obscureConfig(cfg) {
+function stripSecretsFromBackupConfig(cfg) {
   if (!cfg || typeof cfg !== 'object') return cfg
-  const out = { ...cfg }
-  if (out.apiKey) out.apiKey = obscure(out.apiKey)
-  if (out.apiKeys) {
-    out.apiKeys = {}
-    for (const [k, v] of Object.entries(cfg.apiKeys)) {
-      out.apiKeys[k] = obscure(v)
-    }
-  }
-  if (out.ghToken) out.ghToken = obscure(out.ghToken)
-  if (out.audio?.apiKey) {
-    out.audio = { ...out.audio, apiKey: obscure(out.audio.apiKey) }
-  }
-  return out
-}
-
-// 恢复脱敏编码的配置
-function unobscureConfig(cfg) {
-  if (!cfg || typeof cfg !== 'object') return cfg
-  const out = { ...cfg }
-  if (out.apiKey) out.apiKey = unobscure(out.apiKey)
-  if (out.apiKeys) {
-    out.apiKeys = {}
-    for (const [k, v] of Object.entries(cfg.apiKeys)) {
-      out.apiKeys[k] = unobscure(v)
-    }
-  }
-  if (out.ghToken) out.ghToken = unobscure(out.ghToken)
-  if (out.audio?.apiKey) {
-    out.audio = { ...out.audio, apiKey: unobscure(out.audio.apiKey) }
-  }
-  return out
+  const { ghToken, ...safe } = cfg
+  return safe
 }
 
 export function exportAllData() {
   let verifiedProviders = {}
   try { verifiedProviders = JSON.parse(localStorage.getItem('ia_verified_providers') || '{}') } catch {}
+  // 备份时排除所有 API Key / Token 等敏感凭证：GitHub Secret Scanning 会
+  // 检测明文和 base64 编码的密钥并拦截上传。密钥是设备本地的，不应上传。
   return {
     jobs: getJobs(),
     interviews: getInterviews(),
     reviews: getReviews(),
     resumes: getResumes(),
     chatHistory: read(KEYS.CHAT_HISTORY),
-    aiConfig: obscureConfig(readObj(KEYS.AI_CONFIG, {})),
-    backupConfig: obscureConfig(readObj(KEYS.BACKUP_CONFIG, {})),
+    aiConfig: stripSecretsFromAIConfig(readObj(KEYS.AI_CONFIG, {})),
+    backupConfig: stripSecretsFromBackupConfig(readObj(KEYS.BACKUP_CONFIG, {})),
     verifiedProviders,
     exportedAt: new Date().toISOString(),
     version: '2.1.0',
@@ -413,15 +379,22 @@ export function importAllData(data) {
       stats.chatHistory = data.chatHistory.length
     }
     if (data.aiConfig && typeof data.aiConfig === 'object') {
-      write(KEYS.AI_CONFIG, unobscureConfig(data.aiConfig))
+      // 恢复 AI 配置时保留当前设备的 API Key（云端备份不含密钥）
+      const currentAi = readObj(KEYS.AI_CONFIG, {})
+      const restoredAi = { ...data.aiConfig }
+      // 保留本地密钥
+      if (currentAi.apiKey) restoredAi.apiKey = currentAi.apiKey
+      if (currentAi.apiKeys) restoredAi.apiKeys = currentAi.apiKeys
+      if (currentAi.audio?.apiKey) {
+        restoredAi.audio = { ...restoredAi.audio, apiKey: currentAi.audio.apiKey }
+      }
+      write(KEYS.AI_CONFIG, restoredAi)
       stats.aiConfig = true
     }
     if (data.backupConfig && typeof data.backupConfig === 'object') {
-      // 恢复备份配置时保留当前设备的 Token：Token 是设备本地凭证，
-      // 不能用云端旧值覆盖当前设备可能已更新的 Token
+      // 恢复备份配置时保留当前设备的 Token
       const currentBackup = readObj(KEYS.BACKUP_CONFIG, {})
-      const restored = unobscureConfig(data.backupConfig)
-      write(KEYS.BACKUP_CONFIG, { ...restored, ghToken: currentBackup.ghToken || restored.ghToken || '' })
+      write(KEYS.BACKUP_CONFIG, { ...data.backupConfig, ghToken: currentBackup.ghToken || '' })
       stats.backupConfig = true
     }
     if (data.verifiedProviders && typeof data.verifiedProviders === 'object') {
