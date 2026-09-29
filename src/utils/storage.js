@@ -415,7 +415,11 @@ export function importAllData(data) {
       stats.aiConfig = true
     }
     if (data.backupConfig && typeof data.backupConfig === 'object') {
-      write(KEYS.BACKUP_CONFIG, unobscureConfig(data.backupConfig))
+      // 恢复备份配置时保留当前设备的 Token：Token 是设备本地凭证，
+      // 不能用云端旧值覆盖当前设备可能已更新的 Token
+      const currentBackup = readObj(KEYS.BACKUP_CONFIG, {})
+      const restored = unobscureConfig(data.backupConfig)
+      write(KEYS.BACKUP_CONFIG, { ...restored, ghToken: currentBackup.ghToken || restored.ghToken || '' })
       stats.backupConfig = true
     }
     if (data.verifiedProviders && typeof data.verifiedProviders === 'object') {
