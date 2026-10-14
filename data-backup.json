@@ -460,7 +460,7 @@
     "provider": "qwen",
     "model": "qwen-plus",
     "customEndpoint": "",
-    "updatedAt": "2026-09-29T09:48:50.022Z",
+    "updatedAt": "2026-10-14T11:34:10.458Z",
     "audio": {
       "provider": "groq",
       "model": "whisper-large-v3-turbo",
@@ -474,9 +474,9 @@
     "repo": "interview-assistant",
     "branch": "main",
     "path": "data-backup.json",
-    "lastBackupAt": "2026-09-28T14:44:55.390Z",
-    "lastBackupStatus": "fail",
-    "updatedAt": "2026-09-29T09:48:50.022Z"
+    "lastBackupAt": "2026-09-29T09:48:56.623Z",
+    "lastBackupStatus": "success",
+    "updatedAt": "2026-10-14T11:34:10.458Z"
   },
   "verifiedProviders": {
     "agnes": "ok",
@@ -484,7 +484,7 @@
     "qwen": "ok",
     "zhipu": "ok"
   },
-  "exportedAt": "2026-09-29T09:48:51.774Z",
+  "exportedAt": "2026-10-14T11:34:13.035Z",
   "version": "2.1.0",
-  "backedUpAt": "2026-09-29T09:48:54.403Z"
+  "backedUpAt": "2026-10-14T11:34:15.359Z"
 }
