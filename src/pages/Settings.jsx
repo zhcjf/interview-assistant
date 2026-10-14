@@ -9,6 +9,9 @@ import {
   saveBackupConfig,
   importPhase1Data,
   importAllData,
+  getCurrentUser,
+  setCurrentUser,
+  logoutUser,
 } from '../utils/storage.js'
 import { useToast } from '../components/Toast.jsx'
 import { useConfirm } from '../components/ConfirmDialog.jsx'
@@ -128,6 +131,13 @@ export default function Settings() {
   const [backupVerified, setBackupVerified] = useState(false)
   const [pushingBackup, setPushingBackup] = useState(false)
   const [pullingBackup, setPullingBackup] = useState(false)
+
+  // User Account (加密同步)
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser())
+  const [syncUsername, setSyncUsername] = useState('')
+  const [syncPassword, setSyncPassword] = useState('')
+  const [showSyncPassword, setShowSyncPassword] = useState(false)
+  const [syncAction, setSyncAction] = useState(null) // 'login' | 'register'
 
   useEffect(() => {
     saveAIConfig(aiConfig)
@@ -427,9 +437,10 @@ export default function Settings() {
       toast.error('请先填写并验证备份配置')
       return
     }
+    const password = currentUser ? syncPassword : null
     setPushingBackup(true)
     const data = exportAllData()
-    const result = await pushBackup(backupConfig, data)
+    const result = await pushBackup(backupConfig, data, password)
     setPushingBackup(false)
     if (result.ok) {
       const updated = { ...backupConfig, lastBackupAt: new Date().toISOString(), lastBackupStatus: 'success' }
@@ -456,8 +467,9 @@ export default function Settings() {
       danger: true,
     })
     if (!ok) return
+    const password = currentUser ? syncPassword : null
     setPullingBackup(true)
-    const result = await pullBackup(backupConfig)
+    const result = await pullBackup(backupConfig, password)
     setPullingBackup(false)
     if (result.ok && result.data) {
       const importResult = importAllData(result.data)
@@ -473,6 +485,99 @@ export default function Settings() {
     } else {
       toast.error(result.msg || '拉取失败')
     }
+  }
+
+  // ── 账号同步：登录 / 注册 / 登出 ───────────────────────────────────
+  const handleLogin = async () => {
+    if (!syncUsername.trim() || !syncPassword) {
+      toast.error('请输入用户名和密码')
+      return
+    }
+    if (!backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo) {
+      toast.error('请先配置 GitHub 备份信息')
+      return
+    }
+    setSyncAction('login')
+    try {
+      // 尝试从云端拉取该用户的加密备份
+      const result = await pullBackup(backupConfig, syncPassword)
+      if (result.ok && result.data) {
+        // 登录成功：设置用户并恢复数据
+        setCurrentUser(syncUsername, syncPassword)
+        setCurrentUserState(getCurrentUser())
+        window.dispatchEvent(new CustomEvent('ia:user-changed'))
+        const importResult = importAllData(result.data)
+        if (importResult.ok) {
+          toast.success(`✓ 登录成功，已恢复数据`)
+          setTimeout(() => window.location.reload(), 1200)
+        } else {
+          toast.success('✓ 登录成功')
+          setTimeout(() => window.location.reload(), 500)
+        }
+      } else {
+        toast.error('登录失败：' + (result.msg || '用户名或密码错误'))
+      }
+    } catch (e) {
+      toast.error('登录失败：' + e.message)
+    } finally {
+      setSyncAction(null)
+    }
+  }
+
+  const handleRegister = async () => {
+    if (!syncUsername.trim() || !syncPassword) {
+      toast.error('请输入用户名和密码')
+      return
+    }
+    if (syncPassword.length < 6) {
+      toast.error('密码至少需要 6 位')
+      return
+    }
+    if (!backupConfig.ghToken || !backupConfig.owner || !backupConfig.repo) {
+      toast.error('请先配置 GitHub 备份信息')
+      return
+    }
+    setSyncAction('register')
+    try {
+      // 检查该用户名是否已有云端备份
+      const check = await pullBackup(backupConfig, syncPassword)
+      if (check.ok) {
+        toast.error('该用户名已被注册，请直接登录')
+        setSyncAction(null)
+        return
+      }
+      // 注册：用当前本地数据创建加密备份
+      setCurrentUser(syncUsername, syncPassword)
+      setCurrentUserState(getCurrentUser())
+      window.dispatchEvent(new CustomEvent('ia:user-changed'))
+      const data = exportAllData()
+      const result = await pushBackup(backupConfig, data, syncPassword)
+      if (result.ok) {
+        toast.success('✓ 注册成功，数据已加密备份到云端')
+        setTimeout(() => window.location.reload(), 800)
+      } else {
+        toast.error('注册失败：' + result.msg)
+      }
+    } catch (e) {
+      toast.error('注册失败：' + e.message)
+    } finally {
+      setSyncAction(null)
+    }
+  }
+
+  const handleLogout = () => {
+    logoutUser()
+    setCurrentUserState(null)
+    setSyncUsername('')
+    setSyncPassword('')
+    window.dispatchEvent(new CustomEvent('ia:user-changed'))
+    toast.success('已登出')
+    setTimeout(() => window.location.reload(), 500)
+  }
+
+  // 辅助：刷新用户状态（用于 setCurrentUser 后同步 React state）
+  const setCurrentUserState = (user) => {
+    setCurrentUser(user)
   }
 
   return (
@@ -836,6 +941,98 @@ export default function Settings() {
               </span>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ===== 账号同步 ===== */}
+      <div className="card p-6 mb-5">
+        <div className="flex items-start gap-3 mb-5">
+          <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-text-primary">账号同步</h3>
+            <p className="text-sm text-text-tertiary mt-0.5">
+              {currentUser
+                ? `当前登录：${currentUser.username} · 数据已隔离，换设备输入同样账号密码即可恢复`
+                : '设置同步账号后，数据将加密存储到云端，换设备登录即可恢复'}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-gray-50 border border-border space-y-4">
+          {currentUser ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
+                <div className="flex items-center gap-2">
+                  <IconCheck width={16} height={16} className="text-success" />
+                  <span className="text-sm font-medium text-success">
+                    已登录：{currentUser.username}
+                  </span>
+                </div>
+                <button onClick={handleLogout} className="btn-secondary text-xs">
+                  登出
+                </button>
+              </div>
+              <p className="text-xs text-text-tertiary">
+                💡 你的数据已按账号隔离存储。在其他设备输入同样的账号密码即可登录并恢复数据。
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-text-secondary mb-1.5 block">用户名</label>
+                  <input
+                    className="input w-full"
+                    placeholder="设置用户名"
+                    value={syncUsername}
+                    onChange={(e) => setSyncUsername(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-text-secondary mb-1.5 block">同步密码</label>
+                  <div className="relative">
+                    <input
+                      type={showSyncPassword ? 'text' : 'password'}
+                      className="input w-full pr-16"
+                      placeholder="至少 6 位"
+                      value={syncPassword}
+                      onChange={(e) => setSyncPassword(e.target.value)}
+                    />
+                    <button
+                      onClick={() => setShowSyncPassword(!showSyncPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-tertiary hover:text-text-primary px-2 py-1"
+                    >
+                      {showSyncPassword ? '隐藏' : '显示'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-text-tertiary">
+                🔒 密码用于加密你的数据，不会上传到任何服务器。请务必牢记，忘记密码将无法恢复数据。
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleLogin}
+                  disabled={syncAction === 'login'}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {syncAction === 'login' ? '登录中...' : '登录'}
+                </button>
+                <button
+                  onClick={handleRegister}
+                  disabled={syncAction === 'register'}
+                  className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {syncAction === 'register' ? '注册中...' : '注册新账号'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

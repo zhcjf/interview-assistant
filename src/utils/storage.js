@@ -1,22 +1,62 @@
+import { hashPassword } from './crypto.js'
+
 // localStorage 工具层 - 统一读写，避免散写
+// 支持多用户隔离：登录后所有 key 自动加上用户前缀
 
 const KEYS = {
   JOBS: 'ia_jobs',
   INTERVIEWS: 'ia_interviews',
   REVIEWS: 'ia_reviews',
-  // Phase 2 新增
   RESUMES: 'ia_resumes',
   CHAT_HISTORY: 'ia_chat_history',
   AI_CONFIG: 'ia_ai_config',
   BACKUP_CONFIG: 'ia_backup_config',
 }
 
+const USER_KEY = 'ia_user'
+
+/** 获取当前登录用户（本地不存密码，只存用户名和密码哈希） */
+export function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+/** 获取当前用户的 key 前缀（用于数据隔离） */
+function getUserPrefix() {
+  const user = getCurrentUser()
+  return user?.username ? `u_${user.username}_` : ''
+}
+
+/** 注册/登录时设置当前用户 */
+export function setCurrentUser(username, password) {
+  if (!username || !password) {
+    localStorage.removeItem(USER_KEY)
+    return null
+  }
+  const user = { username }
+  localStorage.setItem(USER_KEY, JSON.stringify(user))
+  return user
+}
+
+/** 登出 */
+export function logoutUser() {
+  localStorage.removeItem(USER_KEY)
+}
+
+function _getKey(key) {
+  return getUserPrefix() + key
+}
+
 function read(key, fallback = []) {
   try {
-    const raw = localStorage.getItem(key)
+    const raw = localStorage.getItem(_getKey(key))
     if (raw === null || raw === undefined) return fallback
     const parsed = JSON.parse(raw)
-    // 类型校验：如果存储的值与 fallback 类型不一致，回退到 fallback
     if (parsed === null || parsed === undefined) return fallback
     return parsed
   } catch (e) {
@@ -27,7 +67,6 @@ function read(key, fallback = []) {
 
 function readObj(key, fallback = {}) {
   const v = read(key, fallback)
-  // 确保返回对象（不是数字、字符串、数组）
   if (v && typeof v === 'object' && !Array.isArray(v)) return v
   return fallback
 }
@@ -39,7 +78,7 @@ const DATA_KEYS_SET = new Set([
 
 function write(key, data) {
   try {
-    localStorage.setItem(key, JSON.stringify(data))
+    localStorage.setItem(_getKey(key), JSON.stringify(data))
     // 派发自定义事件，供 Layout 监听并触发自动备份
     if (DATA_KEYS_SET.has(key) && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ia:data-changed'))

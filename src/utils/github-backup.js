@@ -129,9 +129,11 @@ async function putFile(token, owner, repo, path, content, branch, sha = null, me
   return await res.json()
 }
 
+import { encryptData, decryptData } from './crypto.js'
+
 // ============ 对外接口 ============
 
-export async function pushBackup(cfg, data) {
+export async function pushBackup(cfg, data, password = null) {
   const { ghToken, owner, repo, path = 'data-backup.json', branch = 'data-backup' } = cfg
   if (!ghToken || !owner || !repo) {
     return { ok: false, msg: '备份配置不完整，请填写 Token、用户名和仓库名' }
@@ -139,12 +141,15 @@ export async function pushBackup(cfg, data) {
 
   try {
     await ensureBranch(ghToken, owner, repo, branch)
-    const { sha } = await getFileSha(ghToken, owner, repo, path, branch)
-    const content = JSON.stringify({ ...data, backedUpAt: new Date().toISOString() }, null, 2)
-    await putFile(ghToken, owner, repo, path, content, branch, sha)
+    const actualPath = password ? `${path}.enc` : path
+    const { sha } = await getFileSha(ghToken, owner, repo, actualPath, branch)
+    let content = JSON.stringify({ ...data, backedUpAt: new Date().toISOString() }, null, 2)
+    if (password) {
+      content = await encryptData(content, password)
+    }
+    await putFile(ghToken, owner, repo, actualPath, content, branch, sha)
     return { ok: true, msg: `已备份到 ${owner}/${repo}@${branch}` }
   } catch (e) {
-    // 网络超时给出更友好的提示
     if (e.name === 'TimeoutError' || e.message?.includes('timeout')) {
       return { ok: false, msg: '备份超时，请检查网络后重试（数据已保存在本地）' }
     }
@@ -152,18 +157,23 @@ export async function pushBackup(cfg, data) {
   }
 }
 
-export async function pullBackup(cfg) {
+export async function pullBackup(cfg, password = null) {
   const { ghToken, owner, repo, path = 'data-backup.json', branch = 'data-backup' } = cfg
   if (!ghToken || !owner || !repo) {
     return { ok: false, msg: '备份配置不完整' }
   }
 
   try {
-    const { content } = await getFileSha(ghToken, owner, repo, path, branch)
+    const actualPath = password ? `${path}.enc` : path
+    const { content } = await getFileSha(ghToken, owner, repo, actualPath, branch)
     if (!content) {
       return { ok: false, msg: '远端暂无备份数据，请先在其他设备执行一次备份' }
     }
-    const parsed = JSON.parse(content)
+    let plaintext = content
+    if (password) {
+      plaintext = await decryptData(content, password)
+    }
+    const parsed = JSON.parse(plaintext)
     return {
       ok: true,
       data: parsed,
@@ -171,6 +181,7 @@ export async function pullBackup(cfg) {
     }
   } catch (e) {
     if (e.name === 'TimeoutError') return { ok: false, msg: '拉取超时，请检查网络' }
+    if (e.message?.includes('decrypt')) return { ok: false, msg: '解密失败，请检查密码是否正确' }
     return { ok: false, msg: e.message || '拉取失败' }
   }
 }
