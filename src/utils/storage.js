@@ -373,16 +373,19 @@ function stripSecretsFromBackupConfig(cfg) {
 export function exportAllData() {
   let verifiedProviders = {}
   try { verifiedProviders = JSON.parse(localStorage.getItem('ia_verified_providers') || '{}') } catch {}
-  // 备份时排除所有 API Key / Token 等敏感凭证：GitHub Secret Scanning 会
-  // 检测明文和 base64 编码的密钥并拦截上传。密钥是设备本地的，不应上传。
+  const user = getCurrentUser()
+  // 已登录用户：数据会被加密上传，GitHub Secret Scanning 检测不到密文，可以包含 API Key
+  // 未登录用户：明文上传，继续排除敏感字段
+  const aiConfig = readObj(KEYS.AI_CONFIG, {})
+  const backupConfigData = readObj(KEYS.BACKUP_CONFIG, {})
   return {
     jobs: getJobs(),
     interviews: getInterviews(),
     reviews: getReviews(),
     resumes: getResumes(),
     chatHistory: read(KEYS.CHAT_HISTORY),
-    aiConfig: stripSecretsFromAIConfig(readObj(KEYS.AI_CONFIG, {})),
-    backupConfig: stripSecretsFromBackupConfig(readObj(KEYS.BACKUP_CONFIG, {})),
+    aiConfig: user ? aiConfig : stripSecretsFromAIConfig(aiConfig),
+    backupConfig: user ? backupConfigData : stripSecretsFromBackupConfig(backupConfigData),
     verifiedProviders,
     exportedAt: new Date().toISOString(),
     version: '2.1.0',
@@ -418,22 +421,30 @@ export function importAllData(data) {
       stats.chatHistory = data.chatHistory.length
     }
     if (data.aiConfig && typeof data.aiConfig === 'object') {
-      // 恢复 AI 配置时保留当前设备的 API Key（云端备份不含密钥）
+      // 恢复 AI 配置：登录用户直接使用云端密钥（加密备份已包含完整密钥）
       const currentAi = readObj(KEYS.AI_CONFIG, {})
       const restoredAi = { ...data.aiConfig }
-      // 保留本地密钥
-      if (currentAi.apiKey) restoredAi.apiKey = currentAi.apiKey
-      if (currentAi.apiKeys) restoredAi.apiKeys = currentAi.apiKeys
-      if (currentAi.audio?.apiKey) {
-        restoredAi.audio = { ...restoredAi.audio, apiKey: currentAi.audio.apiKey }
+      // 未登录用户：云端备份不含密钥，保留本地密钥
+      const user = getCurrentUser()
+      if (!user) {
+        if (currentAi.apiKey) restoredAi.apiKey = currentAi.apiKey
+        if (currentAi.apiKeys) restoredAi.apiKeys = currentAi.apiKeys
+        if (currentAi.audio?.apiKey) {
+          restoredAi.audio = { ...restoredAi.audio, apiKey: currentAi.audio.apiKey }
+        }
       }
       write(KEYS.AI_CONFIG, restoredAi)
       stats.aiConfig = true
     }
     if (data.backupConfig && typeof data.backupConfig === 'object') {
-      // 恢复备份配置时保留当前设备的 Token
+      // 恢复备份配置：登录用户直接使用云端 Token（加密备份已包含）
       const currentBackup = readObj(KEYS.BACKUP_CONFIG, {})
-      write(KEYS.BACKUP_CONFIG, { ...data.backupConfig, ghToken: currentBackup.ghToken || '' })
+      const user = getCurrentUser()
+      if (user) {
+        write(KEYS.BACKUP_CONFIG, data.backupConfig)
+      } else {
+        write(KEYS.BACKUP_CONFIG, { ...data.backupConfig, ghToken: currentBackup.ghToken || '' })
+      }
       stats.backupConfig = true
     }
     if (data.verifiedProviders && typeof data.verifiedProviders === 'object') {
