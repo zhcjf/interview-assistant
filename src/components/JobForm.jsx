@@ -61,6 +61,9 @@ export default function JobForm({ job, onSave, onCancel }) {
     setParsing(true)
     try {
       const result = await parseJDFromImage(aiConfig, file)
+      if (!result || typeof result !== 'object') {
+        throw new Error('AI 返回结果异常，请重试或更换模型')
+      }
       setForm((prev) => ({
         ...prev,
         company: result.company || prev.company,

@@ -1223,21 +1223,30 @@ export async function parseJDFromImage(aiConfig, imageFile) {
             type: 'image_url',
             image_url: {
               url: `data:${mimeType};base64,${base64Data}`,
-              detail: 'high',
             },
           },
         ],
       },
     ],
     temperature: 0.1,
-    max_tokens: 2000,
+    max_tokens: aiConfig.provider === 'zhipu' ? 1000 : (aiConfig.provider === 'qwen' ? 1500 : 2000),
+  }
+
+  // AbortSignal.timeout 兼容性处理（Safari < 16.4 不支持）
+  let signal
+  if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+    signal = AbortSignal.timeout(30000)
+  } else {
+    const ctrl = new AbortController()
+    setTimeout(() => ctrl.abort(), 30000)
+    signal = ctrl.signal
   }
 
   const response = await fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
+    signal,
   })
 
   if (!response.ok) {
@@ -1253,7 +1262,11 @@ export async function parseJDFromImage(aiConfig, imageFile) {
   const content = data.choices?.[0]?.message?.content
   if (!content) throw new Error('AI 返回空内容')
 
-  return safeParseJSON(content)
+  const result = safeParseJSON(content)
+  if (!result || typeof result !== 'object') {
+    throw new Error('AI 返回格式异常，请重试或更换模型')
+  }
+  return result
 }
 
 /** 压缩图片到指定宽度，返回 Blob */
